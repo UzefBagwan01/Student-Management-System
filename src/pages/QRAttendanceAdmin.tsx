@@ -25,8 +25,14 @@ export default function QRAttendanceAdmin() {
   const [subject, setSubject] = useState('');
   const [lectureName, setLectureName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  
+  const [startHr, setStartHr] = useState('09');
+  const [startMin, setStartMin] = useState('00');
+  const [startAmPm, setStartAmPm] = useState('AM');
+  
+  const [endHr, setEndHr] = useState('10');
+  const [endMin, setEndMin] = useState('00');
+  const [endAmPm, setEndAmPm] = useState('AM');
 
   // Current session being viewed
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -78,12 +84,23 @@ export default function QRAttendanceAdmin() {
 
   if (role !== 'admin' && role !== 'teacher') return <Navigate to="/" />;
 
+  const formatTime24 = (hr: string, min: string, ampm: string) => {
+    let h = parseInt(hr, 10);
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${min}`;
+  };
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!department || !year || !subject || !lectureName || !date || !startTime || !endTime) {
+    if (!department || !year || !subject || !lectureName || !date) {
       alert("Please fill all fields");
       return;
     }
+    
+    const startTime = formatTime24(startHr, startMin, startAmPm);
+    const endTime = formatTime24(endHr, endMin, endAmPm);
+
     // End time must be after start time, simplified validation here
     const s = await mockDb.addQRSession({
       department,
@@ -120,6 +137,17 @@ export default function QRAttendanceAdmin() {
 
   const getStudentInfo = (studentId: string) => {
     return students.find(s => s.id === studentId);
+  };
+
+  const format12Hour = (time24: string) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':');
+    if (!h || !m) return time24;
+    let hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
   };
 
   // Report logic
@@ -199,14 +227,36 @@ export default function QRAttendanceAdmin() {
                 <label className="text-sm font-medium text-gray-700 dark:text-neutral-300">Date</label>
                 <input required type="date" className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={date} onChange={e => setDate(e.target.value)} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700 dark:text-neutral-300">Start Time</label>
-                  <input required type="time" className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <div className="flex space-x-2">
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={startHr} onChange={e => setStartHr(e.target.value)}>
+                        {Array.from({length: 12}, (_, i) => i + 1).map(h => <option key={h} value={h.toString().padStart(2, '0')}>{h.toString().padStart(2, '0')}</option>)}
+                     </select>
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={startMin} onChange={e => setStartMin(e.target.value)}>
+                        {Array.from({length: 60}, (_, i) => i).map(m => <option key={m} value={m.toString().padStart(2, '0')}>{m.toString().padStart(2, '0')}</option>)}
+                     </select>
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={startAmPm} onChange={e => setStartAmPm(e.target.value)}>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                     </select>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700 dark:text-neutral-300">End Time (Expiry)</label>
-                  <input required type="time" className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  <div className="flex space-x-2">
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={endHr} onChange={e => setEndHr(e.target.value)}>
+                        {Array.from({length: 12}, (_, i) => i + 1).map(h => <option key={h} value={h.toString().padStart(2, '0')}>{h.toString().padStart(2, '0')}</option>)}
+                     </select>
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={endMin} onChange={e => setEndMin(e.target.value)}>
+                        {Array.from({length: 60}, (_, i) => i).map(m => <option key={m} value={m.toString().padStart(2, '0')}>{m.toString().padStart(2, '0')}</option>)}
+                     </select>
+                     <select className="w-full px-3 py-2 border border-neutral-300 rounded-md dark:bg-neutral-900 dark:border-neutral-700" value={endAmPm} onChange={e => setEndAmPm(e.target.value)}>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                     </select>
+                  </div>
                 </div>
               </div>
               
@@ -244,7 +294,7 @@ export default function QRAttendanceAdmin() {
                               </span>
                             </div>
                             <div className="text-xs text-gray-500">{s.department} - {s.year}</div>
-                            <div className="text-xs text-gray-400 mt-2">{s.date} • {s.startTime} - {s.endTime}</div>
+                            <div className="text-xs text-gray-400 mt-2">{s.date} • {format12Hour(s.startTime)} - {format12Hour(s.endTime)}</div>
                           </div>
                         );
                       })}
@@ -292,7 +342,7 @@ export default function QRAttendanceAdmin() {
                         </div>
                         <div>
                           <span className="block text-gray-400 text-xs">Time</span>
-                          <span className="font-semibold">{currentSession.startTime} - {currentSession.endTime}</span>
+                          <span className="font-semibold">{format12Hour(currentSession.startTime)} - {format12Hour(currentSession.endTime)}</span>
                         </div>
                         <div>
                           <span className="block text-gray-400 text-xs">Date</span>
@@ -400,7 +450,7 @@ export default function QRAttendanceAdmin() {
                             <td className="px-6 py-4 text-sm text-gray-500 font-mono">{stud.studentId}</td>
                             <td className="px-6 py-4 text-sm text-gray-700 dark:text-neutral-300">{sess.subject}</td>
                             <td className="px-6 py-4 text-sm text-gray-500">{sess.date}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{sess.startTime} - {sess.endTime}</td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{format12Hour(sess.startTime)} - {format12Hour(sess.endTime)}</td>
                             <td className="px-6 py-4 text-sm"><span className="text-green-700 bg-green-100 px-2 py-1 rounded-full text-[10px] font-bold">Present</span></td>
                           </tr>
                         );
