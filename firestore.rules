@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      // For the sake of the internship project, we hardcode the admin email
+      return isAuthenticated() && request.auth.token.email == 'admin@college.com';
+    }
+
+    // A student is simply any authenticated user who isn't the admin.
+    
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /students/{studentId} {
+      // An admin can do anything. A student can only read their own record.
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == studentId);
+      allow write: if isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    match /marks/{markId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+  }
+}
