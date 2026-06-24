@@ -26,7 +26,13 @@ export default function QRAttendanceScan() {
       try {
         html5QrcodeScanner = new Html5QrcodeScanner(
           "qr-reader",
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            videoConstraints: {
+              facingMode: "environment"
+            }
+          },
           /* verbose= */ false
         );
         html5QrcodeScanner.render(
@@ -162,6 +168,9 @@ export default function QRAttendanceScan() {
                    <div className="mt-4 text-center text-sm text-gray-500 flex items-center justify-center">
                      <ScanLine size={16} className="mr-2" /> Position the QR code within the frame to scan
                    </div>
+                   <p className="mt-3 text-xs text-amber-600 dark:text-amber-500 text-center font-medium bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
+                     Note: If the camera does not open on your phone in preview, tap "Open in new tab" and ensure your browser has camera permissions.
+                   </p>
                  </div>
                ) : scanStatus === 'success' ? (
                  <div className="text-center py-12 px-6">

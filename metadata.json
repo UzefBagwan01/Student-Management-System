@@ -1,6 +1,6 @@
 {
   "name": "Fee Management System",
   "description": "A comprehensive fee management system for students and administrators.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
