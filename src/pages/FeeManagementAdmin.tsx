@@ -72,12 +72,15 @@ export default function FeeManagementAdmin() {
       const total = Number(structureForm.tuitionFee || 0) + Number(structureForm.examFee || 0) + Number(structureForm.libraryFee || 0) + Number(structureForm.laboratoryFee || 0) + Number(structureForm.developmentFee || 0) + Number(structureForm.otherCharges || 0);
       const payload = {
         ...structureForm,
-        tuitionFee: Number(structureForm.tuitionFee),
-        examFee: Number(structureForm.examFee),
-        libraryFee: Number(structureForm.libraryFee),
-        laboratoryFee: Number(structureForm.laboratoryFee),
-        developmentFee: Number(structureForm.developmentFee),
-        otherCharges: Number(structureForm.otherCharges),
+        department: structureForm.department || '',
+        year: structureForm.year || '',
+        academicYear: structureForm.academicYear || '',
+        tuitionFee: Number(structureForm.tuitionFee || 0),
+        examFee: Number(structureForm.examFee || 0),
+        libraryFee: Number(structureForm.libraryFee || 0),
+        laboratoryFee: Number(structureForm.laboratoryFee || 0),
+        developmentFee: Number(structureForm.developmentFee || 0),
+        otherCharges: Number(structureForm.otherCharges || 0),
         totalFee: total,
         createdAt: Date.now()
       } as Omit<FeeStructure, 'id'>;
@@ -156,7 +159,7 @@ export default function FeeManagementAdmin() {
     return acc;
   }, {} as Record<string, { studentId: string, totalFee: number, paidAmount: number, pendingAmount: number, fees: StudentFee[] }>);
 
-  const consolidatedFees = Object.values(groupedStudentFees);
+  const consolidatedFees: { studentId: string, totalFee: number, paidAmount: number, pendingAmount: number, fees: StudentFee[] }[] = Object.values(groupedStudentFees);
 
   const handleDownloadAssignedFees = () => {
     const doc = new jsPDF();

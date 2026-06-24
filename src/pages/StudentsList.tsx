@@ -71,7 +71,13 @@ export default function StudentsList() {
       if (editingId) {
         await mockDb.updateStudent(editingId, formData);
       } else {
-        await mockDb.addStudent(formData as Omit<Student, 'id'>);
+        const newUser = await mockDb.addUser({email: formData.email!, password: 'student123'});
+        const studentData = { 
+          ...formData, 
+          userId: newUser?.id,
+          gender: formData.gender || 'Male'
+        } as Omit<Student, 'id'>;
+        await mockDb.addStudent(studentData);
       }
       setIsModalOpen(false);
       fetchStudents();

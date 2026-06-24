@@ -150,8 +150,8 @@ export default function Dashboard() {
         <Card className="mt-8">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-6">Department Distribution (Demo)</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="w-full" style={{ height: 300 }}>
+              <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} />

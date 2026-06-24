@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { GraduationCap, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useAuth } from '../hooks/useAuth';
-import { mockDb } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,49 +13,60 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { setAuthData } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      if (email === 'admin@college.com') {
-        if (password === 'admin123') {
-          login(email, 'admin');
-          navigate('/');
-        } else {
-          throw new Error('Invalid Admin credentials.');
-        }
-      } else {
-        const users = await mockDb.getUsers();
-        const teachers = await mockDb.getTeachers();
-        const isTeacher = teachers.some(t => t.email === email);
+      // Hardcoded Admin Login
+      if (email === 'admin@college.com' && password === 'admin123') {
+        const adminUser = { id: 'admin-local', email: 'admin@college.com' };
+        localStorage.setItem('admin_auth', JSON.stringify({ user: adminUser, role: 'admin' }));
+        setAuthData(adminUser, 'admin');
+        navigate('/');
+        return;
+      }
 
-        if (isSignUp) {
-          if (users.find(u => u.email === email)) {
-            throw new Error('Email already registered. Try logging in.');
-          }
-          await mockDb.addUser({ email, password });
-          login(email, isTeacher ? 'teacher' : 'student');
-          navigate('/');
-        } else {
-          // Login
-          const user = users.find(u => u.email === email && u.password === password);
-          if (user) {
-            login(email, isTeacher ? 'teacher' : 'student');
+      if (isSignUp) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        
+        if (signUpError) throw signUpError;
+        setError('Signup successful! Check your email to verify your account.');
+        // After verified, they can log in.
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (signInError) {
+          // Fallback for mock users created by admin without proper supabase auth
+          const { data: students } = await supabase.from('students').select('*').eq('email', email);
+          const { data: teachers } = await supabase.from('teachers').select('*').eq('email', email);
+          
+          if (students && students.length > 0 && password === 'student123') {
+            const u = students[0];
+            const mockUser = { id: u.user_id || u.id, email: u.email };
+            localStorage.setItem('admin_auth', JSON.stringify({ user: mockUser, role: 'student' }));
+            setAuthData(mockUser, 'student');
             navigate('/');
-          } else {
-            // Check for hardcoded generic login fallback
-            if ((password === 'student123' || password === 'teacher123') && !users.find(u => u.email === email)) {
-               // Allow legacy login logic
-               login(email, isTeacher ? 'teacher' : 'student');
-               navigate('/');
-            } else {
-               throw new Error('Invalid email or password.');
-            }
+            return;
+          } else if (teachers && teachers.length > 0 && password === 'teacher123') {
+            const t = teachers[0];
+            const mockUser = { id: t.user_id || t.id, email: t.email };
+            localStorage.setItem('admin_auth', JSON.stringify({ user: mockUser, role: 'teacher' }));
+            setAuthData(mockUser, 'teacher');
+            navigate('/');
+            return;
           }
+          throw signInError;
         }
+        navigate('/');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to authenticate');
@@ -69,8 +80,18 @@ export default function Login() {
       setError('Please enter your email first to reset password.');
       return;
     }
-    setResetSent(true);
-    setError('');
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      setResetSent(true);
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

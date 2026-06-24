@@ -65,12 +65,9 @@ export default function TeachersList() {
       if (editingId) {
         await mockDb.updateTeacher(editingId, formData);
       } else {
-        await mockDb.addTeacher(formData as Omit<Teacher, 'id'>);
-        // also add as user
-        const users = await mockDb.getUsers();
-        if (!users.find(u => u.email === formData.email)) {
-           await mockDb.addUser({email: formData.email!, password: 'teacher123'});
-        }
+        const newUser = await mockDb.addUser({email: formData.email!, password: 'teacher123'});
+        const teacherData = { ...formData, userId: newUser?.id } as Omit<Teacher, 'id'>;
+        await mockDb.addTeacher(teacherData);
       }
       setIsModalOpen(false);
       fetchData();

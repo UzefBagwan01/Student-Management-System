@@ -1,159 +1,206 @@
+import { supabase } from './supabase';
 import { Student, Attendance, Mark, Teacher, TeacherAttendance, QRSession, QRAttendance, FeeStructure, StudentFee, FeeTransaction } from '../types';
 
-const getTable = <T>(name: string): T[] => {
+// Helper to convert snake_case (DB) to camelCase (Frontend)
+const toCamel = (obj: any): any => {
+  if (Array.isArray(obj)) return obj.map(toCamel);
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      acc[camelKey] = toCamel(obj[key]);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
 
-  const data = localStorage.getItem(name);
-  return data ? JSON.parse(data) : [];
-}
-
-const setTable = (name: string, data: any[]) => {
-  localStorage.setItem(name, JSON.stringify(data));
-}
-
-const generateId = () => Math.random().toString(36).substring(2, 9);
+// Helper to convert camelCase (Frontend) to snake_case (DB)
+const toSnake = (obj: any): any => {
+  if (Array.isArray(obj)) return obj.map(toSnake);
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      acc[snakeKey] = toSnake(obj[key]);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
 
 export const mockDb = {
   getTeachers: async () => {
-    return getTable<Teacher>('teachers');
+    const { data } = await supabase.from('teachers').select('*');
+    return toCamel(data || []) as Teacher[];
   },
   addTeacher: async (teacher: Omit<Teacher, 'id'>) => {
-    const teachers = getTable<Teacher>('teachers');
-    const newTeacher = { ...teacher, id: generateId() } as Teacher;
-    setTable('teachers', [...teachers, newTeacher]);
-    return newTeacher;
+    const { data, error } = await supabase.from('teachers').insert([toSnake(teacher)]).select().single();
+    if (error) { console.error(error); alert("DB Error: " + error.message); }
+    if (teacher.userId) {
+      await supabase.from('profiles').update({ role: 'teacher' }).eq('id', teacher.userId);
+    }
+    return toCamel(data) as Teacher;
   },
-  updateTeacher: async (id: string, data: Partial<Teacher>) => {
-    const teachers = getTable<Teacher>('teachers');
-    setTable('teachers', teachers.map(t => t.id === id ? { ...t, ...data } : t));
+  updateTeacher: async (id: string, updates: Partial<Teacher>) => {
+    await supabase.from('teachers').update(toSnake(updates)).eq('id', id);
   },
   deleteTeacher: async (id: string) => {
-    const teachers = getTable<Teacher>('teachers');
-    setTable('teachers', teachers.filter(t => t.id !== id));
+    await supabase.from('teachers').delete().eq('id', id);
   },
+
   getTeacherAttendances: async () => {
-    return getTable<TeacherAttendance>('teacher_attendance');
+    const { data } = await supabase.from('teacher_attendances').select('*');
+    return toCamel(data || []) as TeacherAttendance[];
   },
   addTeacherAttendance: async (attendance: Omit<TeacherAttendance, 'id'>) => {
-    const attendances = getTable<TeacherAttendance>('teacher_attendance');
-    const newAtt = { ...attendance, id: generateId() } as TeacherAttendance;
-    setTable('teacher_attendance', [...attendances, newAtt]);
-    return newAtt;
+    const { data } = await supabase.from('teacher_attendances').insert([toSnake(attendance)]).select().single();
+    return toCamel(data) as TeacherAttendance;
   },
+
   getBranches: async () => {
-    return getTable<{id: string, name: string}>('branches');
+    // Branches are not in supabase, keeping in localStorage for now
+    const data = localStorage.getItem('branches');
+    return data ? JSON.parse(data) : [];
   },
   addBranch: async (name: string) => {
-    const branches = getTable<{id: string, name: string}>('branches');
-    const newBranch = { id: generateId(), name };
-    setTable('branches', [...branches, newBranch]);
+    const branches = await mockDb.getBranches();
+    const newBranch = { id: Math.random().toString(36).substring(2, 9), name };
+    localStorage.setItem('branches', JSON.stringify([...branches, newBranch]));
     return newBranch;
   },
   deleteBranch: async (id: string) => {
-    const branches = getTable<{id: string, name: string}>('branches');
-    setTable('branches', branches.filter(b => b.id !== id));
+    const branches = await mockDb.getBranches();
+    localStorage.setItem('branches', JSON.stringify(branches.filter((b: any) => b.id !== id)));
   },
+
   getUsers: async () => {
-    return getTable<{email: string, password: string}>('users');
+    // Not directly possible from client to get all auth users securely, returning mock
+    return [];
   },
   addUser: async (user: {email: string, password: string}) => {
-    const users = getTable<{email: string, password: string}>('users');
-    setTable('users', [...users, user]);
+    const res = await supabase.auth.signUp(user);
+    if (res.error) {
+      console.warn("Auth signUp returned an error (user might already exist):", res.error.message);
+    }
+    // Sign out immediately so admin doesn't take over the new user's session
+    await supabase.auth.signOut();
+    return res.data?.user;
   },
+
   getStudents: async () => { 
-    return getTable<Student>('students'); 
+    const { data } = await supabase.from('students').select('*');
+    return toCamel(data || []) as Student[];
   },
   addStudent: async (student: Omit<Student, 'id'>) => {
-    const students = getTable<Student>('students');
-    const newStudent = { ...student, id: generateId() } as Student;
-    setTable('students', [...students, newStudent]);
-    return newStudent;
+    const { data, error } = await supabase.from('students').insert([toSnake(student)]).select().single();
+    if (error) { console.error(error); alert("DB Error: " + error.message); }
+    return toCamel(data) as Student;
   },
-  updateStudent: async (id: string, data: Partial<Student>) => {
-    const students = getTable<Student>('students');
-    setTable('students', students.map(s => s.id === id ? { ...s, ...data } : s));
+  updateStudent: async (id: string, updates: Partial<Student>) => {
+    await supabase.from('students').update(toSnake(updates)).eq('id', id);
   },
   deleteStudent: async (id: string) => {
-    const students = getTable<Student>('students');
-    setTable('students', students.filter(s => s.id !== id));
+    await supabase.from('students').delete().eq('id', id);
   },
   
   getAttendances: async () => { 
-    return getTable<Attendance>('attendance'); 
+    const { data } = await supabase.from('attendances').select('*');
+    return toCamel(data || []) as Attendance[];
   },
   addAttendance: async (attendance: Omit<Attendance, 'id'>) => {
-    const attendances = getTable<Attendance>('attendance');
-    const newAtt = { ...attendance, id: generateId() } as Attendance;
-    setTable('attendance', [...attendances, newAtt]);
-    return newAtt;
+    const { data } = await supabase.from('attendances').insert([toSnake(attendance)]).select().single();
+    return toCamel(data) as Attendance;
   },
   
   getMarks: async () => { 
-    return getTable<Mark>('marks'); 
+    const { data } = await supabase.from('marks').select('*');
+    return toCamel(data || []) as Mark[];
   },
   addMark: async (mark: Omit<Mark, 'id'>) => {
-    const marks = getTable<Mark>('marks');
-    const newMark = { ...mark, id: generateId() } as Mark;
-    setTable('marks', [...marks, newMark]);
-    return newMark;
+    const { data } = await supabase.from('marks').insert([toSnake(mark)]).select().single();
+    return toCamel(data) as Mark;
   },
 
   getQRSessions: async () => {
-    return getTable<QRSession>('qr_sessions');
+    const { data } = await supabase.from('qr_sessions').select('*');
+    return toCamel(data || []) as QRSession[];
   },
   addQRSession: async (session: Omit<QRSession, 'id'>) => {
-    const sessions = getTable<QRSession>('qr_sessions');
-    const newSession = { ...session, id: generateId() } as QRSession;
-    setTable('qr_sessions', [...sessions, newSession]);
-    return newSession;
+    const payload = toSnake(session);
+    if (typeof payload.created_at === 'number') {
+      payload.created_at = new Date(payload.created_at).toISOString();
+    }
+    const { data, error } = await supabase.from('qr_sessions').insert([payload]).select().single();
+    if (error) { console.error("Error:", error); alert("DB Error: " + error.message); }
+    return toCamel(data) as QRSession;
   },
   deleteQRSession: async (id: string) => {
-    const sessions = getTable<QRSession>('qr_sessions');
-    setTable('qr_sessions', sessions.filter(s => s.id !== id));
+    await supabase.from('qr_sessions').delete().eq('id', id);
   },
 
   getQRAttendances: async () => {
-    return getTable<QRAttendance>('qr_attendances');
+    const { data } = await supabase.from('qr_attendances').select('*');
+    return toCamel(data || []) as QRAttendance[];
   },
   addQRAttendance: async (attendance: Omit<QRAttendance, 'id'>) => {
-    const attendances = getTable<QRAttendance>('qr_attendances');
-    const newAtt = { ...attendance, id: generateId() } as QRAttendance;
-    setTable('qr_attendances', [...attendances, newAtt]);
-    return newAtt;
+    const payload = toSnake(attendance);
+    if (typeof payload.timestamp === 'number') {
+      payload.timestamp = new Date(payload.timestamp).toISOString();
+    }
+    const { data } = await supabase.from('qr_attendances').insert([payload]).select().single();
+    return toCamel(data) as QRAttendance;
   },
 
   getFeeStructures: async () => {
-    return getTable<FeeStructure>('fee_structures');
+    const { data } = await supabase.from('fee_structures').select('*');
+    return toCamel(data || []) as FeeStructure[];
   },
   addFeeStructure: async (fee: Omit<FeeStructure, 'id'>) => {
-    const fees = getTable<FeeStructure>('fee_structures');
-    const newFee = { ...fee, id: generateId() } as FeeStructure;
-    setTable('fee_structures', [...fees, newFee]);
-    return newFee;
+    const payload = toSnake(fee);
+    if (typeof payload.created_at === 'number') {
+      payload.created_at = new Date(payload.created_at).toISOString();
+    }
+    const { data, error } = await supabase.from('fee_structures').insert([payload]).select().single();
+    if (error) {
+      console.error("Error adding fee structure:", error);
+      alert("Error adding fee structure: " + error.message);
+    }
+    return toCamel(data) as FeeStructure;
   },
   deleteFeeStructure: async (id: string) => {
-    const fees = getTable<FeeStructure>('fee_structures');
-    setTable('fee_structures', fees.filter(f => f.id !== id));
+    await supabase.from('fee_structures').delete().eq('id', id);
   },
+
   getStudentFees: async () => {
-    return getTable<StudentFee>('student_fees');
+    const { data } = await supabase.from('student_fees').select('*');
+    return toCamel(data || []) as StudentFee[];
   },
   addStudentFee: async (fee: Omit<StudentFee, 'id'>) => {
-    const fees = getTable<StudentFee>('student_fees');
-    const newFee = { ...fee, id: generateId() } as StudentFee;
-    setTable('student_fees', [...fees, newFee]);
-    return newFee;
+    const payload = toSnake(fee);
+    if (typeof payload.updated_at === 'number') {
+      payload.updated_at = new Date(payload.updated_at).toISOString();
+    }
+    const { data, error } = await supabase.from('student_fees').insert([payload]).select().single();
+    if (error) { console.error(error); alert("DB Error: " + error.message); }
+    return toCamel(data) as StudentFee;
   },
-  updateStudentFee: async (id: string, data: Partial<StudentFee>) => {
-    const fees = getTable<StudentFee>('student_fees');
-    setTable('student_fees', fees.map(f => f.id === id ? { ...f, ...data } : f));
+  updateStudentFee: async (id: string, updates: Partial<StudentFee>) => {
+    const payload = toSnake(updates);
+    if (typeof payload.updated_at === 'number') {
+      payload.updated_at = new Date(payload.updated_at).toISOString();
+    }
+    await supabase.from('student_fees').update(payload).eq('id', id);
   },
+
   getFeeTransactions: async () => {
-    return getTable<FeeTransaction>('fee_transactions');
+    const { data } = await supabase.from('fee_transactions').select('*');
+    return toCamel(data || []) as FeeTransaction[];
   },
   addFeeTransaction: async (txn: Omit<FeeTransaction, 'id'>) => {
-    const txns = getTable<FeeTransaction>('fee_transactions');
-    const newTxn = { ...txn, id: generateId() } as FeeTransaction;
-    setTable('fee_transactions', [...txns, newTxn]);
-    return newTxn;
+    const payload = toSnake(txn);
+    if (typeof payload.payment_date === 'number') {
+      payload.payment_date = new Date(payload.payment_date).toISOString();
+    }
+    const { data } = await supabase.from('fee_transactions').insert([payload]).select().single();
+    return toCamel(data) as FeeTransaction;
   }
 };

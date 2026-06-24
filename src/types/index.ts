@@ -8,6 +8,7 @@ export interface User {
 
 export interface Teacher {
   id: string;
+  userId?: string;
   teacherId: string;
   fullName: string;
   email: string;
@@ -24,6 +25,7 @@ export interface TeacherAttendance {
 
 export interface Student {
   id: string;
+  userId?: string;
   studentId: string;
   fullName: string;
   email: string;

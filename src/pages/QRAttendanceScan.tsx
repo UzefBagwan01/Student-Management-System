@@ -22,7 +22,7 @@ export default function QRAttendanceScan() {
   // Setup scanner inside useEffect
   useEffect(() => {
     let html5QrcodeScanner: Html5QrcodeScanner | null = null;
-    if (role === 'student' && student && scanStatus === 'idle') {
+    if (role === 'student' && student && !loading && scanStatus === 'idle') {
       try {
         html5QrcodeScanner = new Html5QrcodeScanner(
           "qr-reader",
@@ -55,7 +55,7 @@ export default function QRAttendanceScan() {
         } catch (e) {}
       }
     };
-  }, [role, student, scanStatus]);
+  }, [role, student, scanStatus, loading]);
 
   useEffect(() => {
     const init = async () => {
